@@ -1,98 +1,147 @@
-import Foundation
+import SwiftUI
+import AppKit
+import PipUI
 import PipDomain
 import PipActions
 import PipPersistence
 import PipEngineAdapter
 
-#if canImport(SwiftUI) && canImport(AppKit)
-import SwiftUI
-import AppKit
-
-// macOS-only bootstrap menu bar UI; AppKit lifecycle requires device verification.
-// Hardware and trackpad capture are intentionally not advertised as active.
 @MainActor
-final class BootstrapModel: ObservableObject {
-    @Published var status = "Replay mode · sensor capture not active"
-    private var replayTask: Task<Void, Never>?
+final class PipApplicationDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+    }
 
-    func replay() {
-        guard replayTask == nil else { return }
-        replayTask = Task {
-            defer { replayTask = nil }
-            do {
-                let preset = try PresetPack.everyday()
-                let store = InMemoryBindingStore(bindings: preset.bindings)
-                let control = PipControl(inputMode: .replay)
-                let router = GestureRouter(store: store, control: control)
-                let dispatcher = ActionDispatcher(control: control)
-                let source = ReplaySource(steps: [
-                    ReplayStep(event: GestureEvent(
-                        gesture: Gesture(side: .left, count: .single),
-                        timestamp: ProcessInfo.processInfo.systemUptime,
-                        inputMode: .replay
-                    ))
-                ])
-                var iterator = source.events.makeAsyncIterator()
-                await source.start()
-                if let event = await iterator.next(),
-                   let accepted = await router.route(event) {
-                    let result = await dispatcher.dispatch(accepted)
-                    status = "\(result.status.rawValue): \(result.message)"
-                }
-                await source.finish()
-            } catch {
-                status = "Failed: \(error.localizedDescription)"
-            }
-        }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 }
 
 @main
+@MainActor
 struct PipApplication: App {
-    @StateObject private var model = BootstrapModel()
-
-    var body: some Scene {
-        MenuBarExtra("Pip", systemImage: "hand.tap") {
-            Text(model.status)
-            Button("Replay left single tap") { model.replay() }
-            Divider()
-            Button("Quit Pip") { NSApplication.shared.terminate(nil) }
-        }
-    }
+    @NSApplicationDelegateAdaptor(PipApplicationDelegate.self) private var delegate
+    @StateObject private var model: PipViewModel
+    private let feedback: FeedbackCoordinator
 
     init() {
-        NSApplication.shared.setActivationPolicy(.accessory)
-    }
-}
-#else
-@main
-enum PipApplication {
-    static func main() async {
+        let feedback = FeedbackCoordinator(historyLimit: 100)
+        self.feedback = feedback
+
+        let support = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        )[0].appendingPathComponent("Pip", isDirectory: true)
+
+        let configuration = PipConfiguration(inputMode: .chassisTaps, bindings: [])
+
+        // ConfigStore has no first-run flag in the supplied API. Keep UI progress
+        // in a sibling file; never add undocumented fields to PipConfiguration.
+        //
+        // EngineAdapter constructors and GestureEventSource subscriptions were
+        // omitted. Select a replay lifecycle honestly instead of guessing them.
+        // An embedding host can supply .engine(adapter) and PipCoreBridge after
+        // verifying permission requirements, Option gating, and pre-dispatch interception.
+        let source = PipSourceSelection.replay(ReplaySource(steps: []))
+        let viewModel: PipViewModel
+
         do {
-            let preset = try PresetPack.everyday()
-            let store = InMemoryBindingStore(bindings: preset.bindings)
-            let router = GestureRouter(
-                store: store,
-                control: PipControl(inputMode: .replay)
+            try FileManager.default.createDirectory(
+                at: support, withIntermediateDirectories: true
             )
-            let source = ReplaySource(steps: [
-                ReplayStep(event: GestureEvent(
-                    gesture: Gesture(side: .left, count: .single),
-                    timestamp: ProcessInfo.processInfo.systemUptime,
-                    inputMode: .replay
-                ))
-            ])
-            var iterator = source.events.makeAsyncIterator()
-            await source.start()
-            if let event = await iterator.next(),
-               let accepted = await router.route(event) {
-                print("Replay accepted: \(accepted.binding.slot.side.rawValue) single tap.")
-                print("The menu bar and OS actions require macOS.")
-            }
-            await source.finish()
+            let store = try ConfigStore(
+                fileURL: support.appendingPathComponent("configuration.json"),
+                defaultConfiguration: configuration
+            )
+            viewModel = PipViewModel(
+                bindingStore: store,
+                configStore: store,
+                preferencesURL: support.appendingPathComponent("ui-state.json"),
+                feedback: feedback,
+                source: source
+            )
         } catch {
-            print("Pip failed: \(error.localizedDescription)")
+            viewModel = PipViewModel(
+                bindingStore: InMemoryBindingStore(bindings: []),
+                configStore: nil,
+                preferencesURL: support.appendingPathComponent("ui-state.json"),
+                feedback: feedback,
+                source: source
+            )
+            viewModel.error = "Pip couldn’t open its configuration. Existing files haven’t been replaced. \(error.localizedDescription)"
         }
+        _model = StateObject(wrappedValue: viewModel)
+    }
+
+    var body: some Scene {
+        Window("Tap Map", id: "tap-map") {
+            PipLaunchView()
+                .environmentObject(model)
+                .environment(\.pipFeedback, feedback)
+        }
+        .defaultSize(width: 820, height: 600)
+        .windowResizability(.contentMinSize)
+
+        Window("Meet Pip", id: "onboarding") {
+            OnboardingView()
+                .environmentObject(model)
+                .environment(\.pipFeedback, feedback)
+        }
+        .defaultSize(width: 720, height: 560)
+        .windowResizability(.contentMinSize)
+
+        Window("Pip Settings", id: "pip-settings") {
+            PipSettingsView()
+                .environmentObject(model)
+                .environment(\.pipFeedback, feedback)
+        }
+        .windowResizability(.contentSize)
+
+        MenuBarExtra {
+            MenuBarView()
+                .environmentObject(model)
+                .environment(\.pipFeedback, feedback)
+        } label: {
+            PipStatusLabel()
+                .environmentObject(model)
+        }
+        .menuBarExtraStyle(.menu)
     }
 }
-#endif
+
+private struct PipLaunchView: View {
+    @EnvironmentObject private var model: PipViewModel
+    @Environment(\.openWindow) private var openWindow
+    @State private var checkedFirstRun = false
+
+    var body: some View {
+        TapMapView()
+            .task {
+                guard !checkedFirstRun else { return }
+                checkedFirstRun = true
+                await model.load()
+                if !model.preferences.completedOnboarding {
+                    NSApp.activate(ignoringOtherApps: true)
+                    openWindow(id: "onboarding")
+                }
+            }
+    }
+}
+
+private struct PipStatusLabel: View {
+    @EnvironmentObject private var model: PipViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var compressed = false
+
+    var body: some View {
+        PipMenuGlyph(paused: !model.listening, failed: model.recentFailure != nil)
+            .scaleEffect(x: reduceMotion ? 1 : (compressed ? 0.9 : 1), y: 1)
+            .opacity(reduceMotion && compressed ? 0.65 : 1)
+            .animation(.easeOut(duration: 0.1), value: compressed)
+            .task(id: model.pulse) {
+                compressed = true
+                do { try await Task.sleep(for: .milliseconds(100)) }
+                catch { return }
+                compressed = false
+            }
+    }
+}
