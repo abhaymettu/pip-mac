@@ -687,7 +687,6 @@ public struct TapMapView: View {
                     model.testing.toggle()
                 }
                 Button("Presets…") { presets = true }
-                Spacer()
             }
             Label(model.lastResult, systemImage: model.lastResult.contains("Failed:") ? "exclamationmark.circle" : "checkmark.circle")
                 .font(PipTheme.caption)
@@ -820,4 +819,5 @@ public struct PipSensitivityView: View {
         .disabled(applying)
     }
 }
+
 
