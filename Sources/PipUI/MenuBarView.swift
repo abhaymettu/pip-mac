@@ -111,7 +111,7 @@ public struct MenuBarView: View {
         Menu("Recent results") {
             if entries.isEmpty { Text("No core action results yet") }
             ForEach(Array(entries.suffix(5).reversed().enumerated()), id: \.offset) { _, entry in
-                Text("\(entry.result.status.rawValue): \(entry.result.message)")
+                Text("\(statusLabel(for: entry)): \(entry.result.message)")
             }
         }
         Divider()
@@ -131,6 +131,18 @@ public struct MenuBarView: View {
             await model.load()
             entries = await feedback.history()
             await model.refreshFeedback()
+        }
+    }
+
+    private func statusLabel(for entry: FeedbackEntry) -> String {
+        switch entry.result.status {
+        case .completed: return "Done"
+        case .launched: return "Opened"
+        case .cancelled: return "Cancelled"
+        case .unavailable: return "Unavailable"
+        case .permissionRequired: return "Needs permission"
+        case .busy: return "Busy"
+        case .failed: return "Failed"
         }
     }
 }
@@ -166,6 +178,10 @@ public struct PipSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .tint(PipTheme.accent)
+        .foregroundStyle(PipTheme.ink)
+        .scrollContentBackground(.hidden)
+        .background(PipTheme.canvas)
         .frame(width: 530, height: 480)
         .onDisappear { model.savePreferences() }
     }
