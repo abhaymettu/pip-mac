@@ -85,7 +85,7 @@ public struct MenuBarView: View {
             Button("Pause for 10 minutes") { Task { await model.pause(minutes: 10) } }
         } else {
             Button("Resume") { Task { await model.setListening(true) } }
-                .disabled(!model.canListen || model.onboardingVisible)
+                .disabled(!model.canListen)
         }
         Menu("Input: \(model.input.title)") {
             ForEach(PipInput.allCases) { input in
@@ -137,7 +137,6 @@ public struct MenuBarView: View {
 
 public struct PipSettingsView: View {
     @EnvironmentObject private var model: PipViewModel
-    @Environment(\.openWindow) private var openWindow
 
     public init() {}
 
@@ -149,11 +148,6 @@ public struct PipSettingsView: View {
                     .foregroundStyle(PipTheme.secondary)
                 Button("Input Monitoring settings…") { PipPermissions.requestInput() }
                 Button("Accessibility settings…") { PipPermissions.requestAccessibility() }
-                Button("Revisit setup…") {
-                    model.preferences.onboardingStep = 0
-                    model.savePreferences()
-                    openWindow(id: "onboarding")
-                }
             }
             Section("Feedback") {
                 Toggle("Quiet tap sound", isOn: $model.preferences.quietSound)
@@ -176,3 +170,4 @@ public struct PipSettingsView: View {
         .onDisappear { model.savePreferences() }
     }
 }
+

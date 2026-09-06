@@ -65,8 +65,6 @@ public struct PipSensitivity: Codable {
 }
 
 public struct PipUIConfiguration: Codable {
-    public var completedOnboarding = false
-    public var onboardingStep = 0
     public var input = PipInput.chassis
     public var assignments: [String: PipAction] = [:]
     public var clearedCoreSlots: Set<String> = []
@@ -140,8 +138,6 @@ public final class PipViewModel: ObservableObject {
         didSet { if !testing { alsoRunActions = false } }
     }
     @Published public var alsoRunActions = false
-    @Published public var calibrating = false
-    @Published public var onboardingVisible = false
     @Published public private(set) var pulse = false
 
     public let feedback: FeedbackCoordinator
@@ -157,7 +153,6 @@ public final class PipViewModel: ObservableObject {
     private var resumeTask: Task<Void, Never>?
     private var recognitionTask: Task<Void, Never>?
     private var lastAcknowledgment = Date.distantPast
-    private var pausedBeforeSetup = false
 
     public init(
         bindingStore: any BindingStore,
@@ -300,7 +295,6 @@ public final class PipViewModel: ObservableObject {
         resumeTask?.cancel()
         pauseUntil = nil
         if enabled {
-            guard !onboardingVisible, !calibrating else { return }
             guard let setListening = bridge.setListening else {
                 error = "Live listening isn’t connected in this UI build. You can build your map, run actions explicitly, and watch the practice demo."
                 return
@@ -342,21 +336,6 @@ public final class PipViewModel: ObservableObject {
         }
     }
 
-    public func beginSetup() async {
-        pausedBeforeSetup = listening
-        onboardingVisible = true
-        calibrating = true
-        testing = false
-        await setListening(false)
-    }
-
-    public func endSetup(startListening: Bool) async {
-        onboardingVisible = false
-        calibrating = false
-        if startListening || pausedBeforeSetup { await setListening(true) }
-        pausedBeforeSetup = false
-    }
-
     /// A verified engine adapter calls this BEFORE routing/dispatching the gesture.
     /// It returns whether ordinary action routing is permitted.
     public func intercept(
@@ -372,7 +351,6 @@ public final class PipViewModel: ObservableObject {
             guard !Task.isCancelled else { return }
             recognizedSlot = nil
         }
-        if calibrating || onboardingVisible { return false }
         if testing && !alsoRunActions { return false }
         guard listening else { return false }
 
@@ -396,10 +374,6 @@ public final class PipViewModel: ObservableObject {
     }
 
     public func run(_ slot: PipSlot) async {
-        guard !onboardingVisible, !calibrating else {
-            error = "Actions stay off during setup and calibration."
-            return
-        }
         guard !running.contains(slot.id), running.count < 2 else {
             error = "Two actions are already running. Give them a moment."
             return
@@ -483,7 +457,6 @@ public enum PipPreset: String, CaseIterable, Identifiable {
 
 public struct TapMapView: View {
     @EnvironmentObject private var model: PipViewModel
-    @Environment(\.openWindow) private var openWindow
     @State private var picking: PipSlot?
     @State private var sensitivity = false
     @State private var presets = false
@@ -640,7 +613,7 @@ public struct TapMapView: View {
                 }
                 .help("Run this action without a physical tap")
                 .disabled((action == nil && unresolved == nil) || !enabled
-                          || model.running.contains(slot.id) || model.onboardingVisible)
+                          || model.running.contains(slot.id))
                 Spacer()
                 Menu {
                     Button("Change…") { picking = slot }
@@ -715,7 +688,6 @@ public struct TapMapView: View {
                 }
                 Button("Presets…") { presets = true }
                 Spacer()
-                Button("Setup…") { openWindow(id: "onboarding") }
             }
             Label(model.lastResult, systemImage: model.lastResult.contains("Failed:") ? "exclamationmark.circle" : "checkmark.circle")
                 .font(PipTheme.caption)
@@ -780,7 +752,6 @@ public struct PipPresetPreview: View {
 public struct PipSensitivityView: View {
     @EnvironmentObject private var model: PipViewModel
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openWindow) private var openWindow
     @State private var settings = PipSensitivity()
     @State private var tuneEachSide = false
     @State private var applying = false
@@ -819,12 +790,6 @@ public struct PipSensitivityView: View {
 
             HStack {
                 Button("Restore defaults") { settings = PipSensitivity() }
-                Button("Recalibrate…") {
-                    model.preferences.onboardingStep = 2
-                    model.savePreferences()
-                    dismiss()
-                    openWindow(id: "onboarding")
-                }
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Apply") {
@@ -855,3 +820,4 @@ public struct PipSensitivityView: View {
         .disabled(applying)
     }
 }
+

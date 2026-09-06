@@ -81,14 +81,6 @@ struct PipApplication: App {
         .defaultSize(width: 820, height: 600)
         .windowResizability(.contentMinSize)
 
-        Window("Meet Pip", id: "onboarding") {
-            OnboardingView()
-                .environmentObject(model)
-                .environment(\.pipFeedback, feedback)
-        }
-        .defaultSize(width: 720, height: 560)
-        .windowResizability(.contentMinSize)
-
         Window("Pip Settings", id: "pip-settings") {
             PipSettingsView()
                 .environmentObject(model)
@@ -110,19 +102,14 @@ struct PipApplication: App {
 
 private struct PipLaunchView: View {
     @EnvironmentObject private var model: PipViewModel
-    @Environment(\.openWindow) private var openWindow
-    @State private var checkedFirstRun = false
+    @State private var loaded = false
 
     var body: some View {
         TapMapView()
             .task {
-                guard !checkedFirstRun else { return }
-                checkedFirstRun = true
+                guard !loaded else { return }
+                loaded = true
                 await model.load()
-                if !model.preferences.completedOnboarding {
-                    NSApp.activate(ignoringOtherApps: true)
-                    openWindow(id: "onboarding")
-                }
             }
     }
 }
@@ -145,3 +132,4 @@ private struct PipStatusLabel: View {
             }
     }
 }
+

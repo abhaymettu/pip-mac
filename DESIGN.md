@@ -54,6 +54,13 @@ The emotional core is **physical touch → immediate recognition → useful resu
 
 ## 3. First run
 
+> **Update, 2026-09-05: the in-app onboarding flow is cut.** Pip is not a published
+> app, and setup now lives in the README, which is the onboarding. The six screens
+> below stay in this spec as the record of the permission, calibration, and typing
+> exercise thinking. Their functional parts survive in the product itself: the
+> permission buttons in Settings, Test taps mode, the sensitivity sheet, and the
+> preset picker in the Tap Map.
+
 Onboarding is a compact, resizable window, approximately 720 × 560 points. It has a persistent Back button, clear progress labels, and no carousel dots.
 
 No actions run during setup or calibration.
@@ -648,3 +655,4 @@ System Settings handoffs are confusing, and the permission database can appear s
 Pip is ready when the first successful tap feels inevitable—and the next hundred do not demand attention.
 
 The waveform earns the user’s trust. The six cards make the system understandable. Shortcuts make it personal. Everything else should stay quiet.
+
