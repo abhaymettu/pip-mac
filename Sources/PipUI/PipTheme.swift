@@ -165,19 +165,36 @@ public struct PipEnvelopePoint: Identifiable, Sendable {
     }
 }
 
+public struct PipWaveformMarker: Identifiable, Sendable {
+    public let id: Int
+    public let position: Double
+    public let accepted: Bool
+    public let label: String
+
+    public init(id: Int, position: Double, accepted: Bool, label: String) {
+        self.id = id
+        self.position = min(max(position, 0), 1)
+        self.accepted = accepted
+        self.label = label
+    }
+}
+
 public struct PipWaveform: View {
     public var points: [PipEnvelopePoint]
     public var threshold: Double
     public var annotation: String
+    public var markers: [PipWaveformMarker]
 
     public init(
         points: [PipEnvelopePoint],
         threshold: Double = 0.55,
-        annotation: String = "Waiting for diagnostic samples"
+        annotation: String = "Waiting for diagnostic samples",
+        markers: [PipWaveformMarker] = []
     ) {
         self.points = points
         self.threshold = threshold
         self.annotation = annotation
+        self.markers = markers
     }
 
     public var body: some View {
@@ -201,6 +218,33 @@ public struct PipWaveform: View {
                     trace.addLine(to: CGPoint(x: x, y: mid - point.low * mid))
                 }
                 context.stroke(trace, with: .color(PipTheme.ink), lineWidth: 1)
+
+                for marker in markers {
+                    let x = CGFloat(marker.position) * size.width
+                    let color = marker.accepted ? PipTheme.accent : PipTheme.secondary
+                    var tick = Path()
+                    tick.move(to: CGPoint(x: x, y: mid))
+                    tick.addLine(to: CGPoint(x: x, y: mid + (marker.accepted ? -6 : 6)))
+                    context.stroke(
+                        tick,
+                        with: .color(color),
+                        style: StrokeStyle(lineWidth: 1, dash: marker.accepted ? [] : [2, 2])
+                    )
+
+                    let label = context.resolve(
+                        Text(marker.label)
+                            .font(PipTheme.caption)
+                            .foregroundColor(color)
+                    )
+                    // Keep reason words inside the waveform even at its edges.
+                    let halfWidth = min(label.measure(in: size).width / 2, size.width / 2)
+                    let labelX = min(max(x, halfWidth), size.width - halfWidth)
+                    context.draw(
+                        label,
+                        at: CGPoint(x: labelX, y: mid + (marker.accepted ? -8 : 8)),
+                        anchor: marker.accepted ? .bottom : .top
+                    )
+                }
             }
             .frame(height: 72)
             HStack {
