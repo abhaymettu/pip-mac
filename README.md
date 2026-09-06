@@ -11,8 +11,12 @@ The detection engine is [Bump](https://github.com/Roshan-Rengadurai/bump) (MIT,
 vendored in `Vendor/Bump/`). Pip is the product around it: the tap map, the actions,
 the feedback.
 
-**This repository is private.** Nothing here publishes without the owner's explicit
-approval.
+<p align="center">
+  <img src="docs/hero-mock.png" width="720" alt="The Pip Tap Map window in light and dark appearances, and the menu-bar dropdown" />
+  <br />
+  <sub>Design mock of the Tap Map and menu-bar dropdown, rendered from the SwiftUI source.</sub>
+</p>
+
 
 ## Status
 
@@ -58,6 +62,12 @@ If a permission below seems to stick to the wrong thing, that is why.
 ## Setup
 
 Five minutes, six steps. No account, no network, nothing leaves the Mac.
+
+<p align="center">
+  <img src="docs/tap-zones.png" width="560" alt="Top view of a MacBook with the left and right tap zones and their default bindings" />
+  <br />
+  <sub>The two tap zones and the Everyday preset they start with.</sub>
+</p>
 
 ### 1. Grant the two permissions
 
@@ -201,3 +211,4 @@ vendor types. A replay source makes the whole app demonstrable without hardware.
 
 Pip vendors the detection engine from [Bump](https://github.com/Roshan-Rengadurai/bump)
 by Roshan Rengadurai, MIT licensed. See `Vendor/Bump/LICENSE` and `Vendor/UPSTREAM.md`.
+
