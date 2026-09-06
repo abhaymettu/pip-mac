@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "name": "Everyday",
+  "bindings": [
+    {
+      "id": "01900000-0000-4000-8000-000000000001",
+      "slot": { "side": "left", "count": 1 },
+      "action": { "version": 1, "type": "playPause" },
+      "enabled": true,
+      "comment": "Pause or resume the current media session."
+    },
+    {
+      "id": "01900000-0000-4000-8000-000000000002",
+      "slot": { "side": "left", "count": 2 },
+      "action": { "version": 1, "type": "screenshotInteractiveToClipboard" },
+      "enabled": true,
+      "comment": "Choose a screen region, then paste the capture. Escape dismisses the macOS capture UI."
+    },
+    {
+      "id": "01900000-0000-4000-8000-000000000003",
+      "slot": { "side": "left", "count": 3 },
+      "action": { "version": 1, "type": "toggleMute" },
+      "enabled": true,
+      "comment": "A deliberate triple tap toggles output mute; this does not lock the Mac."
+    },
+    {
+      "id": "01900000-0000-4000-8000-000000000004",
+      "slot": { "side": "right", "count": 1 },
+      "action": { "version": 1, "type": "nextTrack" },
+      "enabled": true,
+      "comment": "Skip forward without changing the focused application."
+    },
+    {
+      "id": "01900000-0000-4000-8000-000000000005",
+      "slot": { "side": "right", "count": 2 },
+      "action": { "version": 1, "type": "previousTrack" },
+      "enabled": true,
+      "comment": "Return to the previous track."
+    },
+    {
+      "id": "01900000-0000-4000-8000-000000000006",
+      "slot": { "side": "right", "count": 3 },
+      "action": {
+        "version": 1,
+        "type": "runShortcut",
+        "name": "REPLACE WITH EXACT SHORTCUT NAME"
+      },
+      "enabled": false,
+      "comment": "Disabled until configured. Refresh Shortcut discovery, select or copy the exact name of your own Shortcut (for example a Start Focus workflow), replace the name field, then enable this binding. Spaces and case are significant; Pip never substitutes a similar name."
+    }
+  ]
+}
