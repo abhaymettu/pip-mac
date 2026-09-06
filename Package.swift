@@ -1,19 +1,5 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 5.10
 import PackageDescription
-
-// Only the portable grouping engine is compiled from Vendor. Sensor capture and
-// permission APIs are deliberately not linked into this milestone.
-var engineSources = ["Sources/PipEngineAdapter"]
-var engineExcludes = [
-    "Resources", "Tests",
-    "Sources/PipDomain", "Sources/PipActions",
-    "Sources/PipPersistence", "Sources/PipApp"
-]
-#if os(macOS)
-engineSources.append("Vendor/Bump/Core/GestureEngine/GestureEngine.swift")
-#else
-engineExcludes.append("Vendor")
-#endif
 
 let package = Package(
     name: "Pip",
@@ -23,45 +9,65 @@ let package = Package(
         .library(name: "PipActions", targets: ["PipActions"]),
         .library(name: "PipPersistence", targets: ["PipPersistence"]),
         .library(name: "PipEngineAdapter", targets: ["PipEngineAdapter"]),
-        .executable(name: "PipApp", targets: ["PipApp"])
+        .library(name: "PipUI", targets: ["PipUI"]),
+        .executable(name: "Pip", targets: ["PipApp"])
     ],
     targets: [
         .target(name: "PipDomain"),
-        .target(name: "PipActions", dependencies: ["PipDomain"]),
+        .target(
+            name: "PipActions",
+            dependencies: ["PipDomain"],
+            linkerSettings: [
+                .linkedFramework("AppKit"),
+                .linkedFramework("ApplicationServices")
+            ]
+        ),
         .target(
             name: "PipPersistence",
-            dependencies: ["PipDomain"],
-            path: ".",
-            exclude: [
-                "Vendor", "Tests", "Sources/PipDomain", "Sources/PipActions",
-                "Sources/PipEngineAdapter", "Sources/PipApp"
-            ],
-            sources: ["Sources/PipPersistence"],
-            resources: [.copy("Resources/Presets")]
+            dependencies: ["PipDomain"]
         ),
         .target(
             name: "PipEngineAdapter",
             dependencies: ["PipDomain"],
-            path: ".",
-            exclude: engineExcludes,
-            sources: engineSources
+            linkerSettings: [
+                .linkedFramework("AppKit"),
+                .linkedFramework("IOKit")
+            ]
+        ),
+        .target(
+            name: "PipUI",
+            dependencies: [
+                "PipDomain",
+                "PipActions",
+                "PipPersistence",
+                "PipEngineAdapter"
+            ],
+            linkerSettings: [
+                .linkedFramework("SwiftUI"),
+                .linkedFramework("AppKit"),
+                .linkedFramework("ApplicationServices"),
+                .linkedFramework("ServiceManagement"),
+                .linkedFramework("Carbon")
+            ]
         ),
         .executableTarget(
             name: "PipApp",
             dependencies: [
-                "PipDomain", "PipActions", "PipPersistence", "PipEngineAdapter"
+                "PipUI",
+                "PipDomain",
+                "PipActions",
+                "PipPersistence",
+                "PipEngineAdapter"
+            ],
+            swiftSettings: [
+                .unsafeFlags(["-parse-as-library"])
             ]
-        ),
-        .testTarget(name: "PipDomainTests", dependencies: ["PipDomain"]),
-        .testTarget(name: "PipActionsTests", dependencies: ["PipActions", "PipDomain"]),
-        .testTarget(
-            name: "PipPersistenceTests",
-            dependencies: ["PipPersistence", "PipDomain"]
-        ),
-        .testTarget(
-            name: "PipEngineAdapterTests",
-            dependencies: ["PipEngineAdapter", "PipDomain"]
         )
-    ],
-    swiftLanguageVersions: [.v5]
+    ]
 )
+
+// Build Apple Silicon with: swift build --arch arm64
+// SwiftPM does not produce a signed .app bundle. Verify TCC, login launch,
+// menu-bar rendering, sensor access, and media-key delivery in the packaged app.
+// Preserve any vendored engine targets/resources from the core package when
+// merging this manifest; none were identified in the supplied public API.
